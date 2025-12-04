@@ -258,14 +258,24 @@ class IpmiServer:
                                             host_target_address=0x20,
                                             keep_alive_interval=0)
         ipmi = pyipmi.create_connection(interface)
-        ipmi.session.set_session_type_rmcp(self._host, self._port)
+        # Ensure port is passed as a string to avoid 'int' object has no attribute 'lower'
+        # This seems counter-intuitive but some versions of python-ipmi may treat port as string internally
+        port = str(self._port) if self._port else "623"
+        ipmi.session.set_session_type_rmcp(self._host, port)
         ipmi.session.set_auth_type_user(self._username, self._password)
         
         # Set Kg key if provided (for encrypted connections)
+        # Note: python-ipmi library may not support set_kg, so check if method exists
         if self._kg_key and self._kg_key != "":
-            # Convert hex string to bytes for pyipmi (ipmitool uses hex string directly via -y flag)
-            kg_bytes = bytes.fromhex(self._kg_key)
-            ipmi.session.set_kg(kg_bytes)
+            if hasattr(ipmi.session, 'set_kg'):
+                # Convert hex string to bytes for pyipmi (ipmitool uses hex string directly via -y flag)
+                try:
+                    kg_bytes = bytes.fromhex(self._kg_key)
+                    ipmi.session.set_kg(kg_bytes)
+                except (ValueError, AttributeError) as err:
+                    _LOGGER.warning("Failed to set Kg key: %s. Kg key may not be supported by this IPMI library version.", err)
+            else:
+                _LOGGER.warning("Kg key specified but python-ipmi library does not support set_kg method. Kg key authentication will not be used. Consider using the ipmi-server addon for full feature support.")
         
         # Set privilege level if provided
         if self._privilege_level and self._privilege_level != "":
@@ -276,7 +286,10 @@ class IpmiServer:
                 "USER": 2,
             }
             priv_level = privilege_map.get(self._privilege_level, 4)  # Default to ADMINISTRATOR
-            ipmi.session.set_priv_level(priv_level)
+            if hasattr(ipmi.session, 'set_priv_level'):
+                ipmi.session.set_priv_level(priv_level)
+            else:
+                _LOGGER.warning("Privilege level specified but python-ipmi library does not support set_priv_level method.")
         
         ipmi.session.establish()
         ipmi.target = pyipmi.Target(ipmb_address=0x20)
