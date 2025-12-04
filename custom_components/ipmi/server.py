@@ -258,14 +258,12 @@ class IpmiServer:
                                             host_target_address=0x20,
                                             keep_alive_interval=0)
         ipmi = pyipmi.create_connection(interface)
-        # Ensure port is passed as a string to avoid 'int' object has no attribute 'lower'
-        # This seems counter-intuitive but some versions of python-ipmi may treat port as string internally
-        port = str(self._port) if self._port else "623"
+        port = int(self._port) if self._port else 623
         ipmi.session.set_session_type_rmcp(self._host, port)
         ipmi.session.set_auth_type_user(self._username, self._password)
         
         # Set Kg key if provided (for encrypted connections)
-        # Note: python-ipmi library may not support set_kg, so check if method exists
+        # Note: python-ipmi library does not support set_kg, so check if method exists
         if self._kg_key and self._kg_key != "":
             if hasattr(ipmi.session, 'set_kg'):
                 # Convert hex string to bytes for pyipmi (ipmitool uses hex string directly via -y flag)
