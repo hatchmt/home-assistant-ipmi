@@ -277,17 +277,7 @@ class IpmiServer:
         
         # Set privilege level if provided
         if self._privilege_level and self._privilege_level != "":
-            # Map privilege level string to pyipmi constant
-            privilege_map = {
-                "ADMINISTRATOR": 4,
-                "OPERATOR": 3,
-                "USER": 2,
-            }
-            priv_level = privilege_map.get(self._privilege_level, 4)  # Default to ADMINISTRATOR
-            if hasattr(ipmi.session, 'set_priv_level'):
-                ipmi.session.set_priv_level(priv_level)
-            else:
-                _LOGGER.warning("Privilege level specified but python-ipmi library does not support set_priv_level method.")
+            ipmi.session.set_priv_level(self._privilege_level)
         
         ipmi.session.establish()
         ipmi.target = pyipmi.Target(ipmb_address=0x20)
